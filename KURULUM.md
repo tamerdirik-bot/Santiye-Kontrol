@@ -33,3 +33,19 @@ Ekip kullanımı için iki adım var: siteyi yayınlamak ve ortak veritabanını
 - Dekont görselleri küçültülüp veritabanına yazılır (Firebase'in dosya deposu ücretli plana geçtiği için kullanılmıyor). PDF en fazla 650 KB.
 - Bildirimler uygulama içindedir: açıkken anlık düşer, kapalıyken sonraki açılışta zil üzerinde sayı görünür.
 - Bir kişinin erişimini Ayarlar > Ekip'ten kapatabilirsiniz. Davet kodunu bilen herkes katılabilir; bağlantıyı yalnızca ekibe verin.
+
+## Güncelleme: kişi bazlı yetkiler (Kasım 2026)
+Bu sürümde gelir bilgileri (birim fiyatlar, sözleşme bedeli, hakediş, tahsilat, kâr, teminatlar) veritabanında ayrı bir bölüme taşındı.
+Sıra önemli:
+1. GitHub'da `app.js`, `index.html` ve `sw.js` dosyalarını yenileriyle değiştirin.
+2. Uygulamayı **yönetici hesabıyla** açın (gerekirse sayfayı bir kez yenileyin). "Veriler yeni yetki yapısına taşındı" mesajını bekleyin.
+3. Firebase → Firestore Database → Rules: içeriği silip bu klasördeki `firestore.rules` dosyasının tamamını yapıştırın → Publish.
+4. Ayarlar → Ekip ve yetkiler: mevcut kişiler "Saha elemanı" olarak gelir. Gelirleri görmesi gerekenleri "Ofis / muhasebe" ya da "Yönetici" yapın.
+5. "Saha elemanı gözüyle gör" ile saha ekranını kontrol edin.
+
+Yetkiler:
+- Gider girer ve görür: tüm giderler ve dekontlar
+- İmalat ve ilerleme girer: metraj, poz tamamlama
+- Gelirleri görür: birim fiyat, sözleşme bedeli, hakediş, tahsilat, kâr, teminatlar; proje açma, keşif yükleme
+- Hakediş alır, tahsilat girer
+- Yönetici: hepsi + ekip ve yetki yönetimi

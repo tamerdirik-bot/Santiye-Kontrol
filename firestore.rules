@@ -1,27 +1,53 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
+    function signed() { return request.auth != null; }
     function uid() { return request.auth.uid; }
     function me() { return get(/databases/$(db)/documents/members/$(uid())).data; }
-    function active() { return request.auth != null && exists(/databases/$(db)/documents/members/$(uid())) && me().status == 'active'; }
+    function active() { return signed() && exists(/databases/$(db)/documents/members/$(uid())) && me().status == 'active'; }
     function admin() { return active() && me().role == 'admin'; }
+    // exp: gider, wrk: imalat, fin: gelirleri görür, hk: hakediş/tahsilat girer
+    function can(k) { return admin() || (active() && me().get('perms', {}).get(k, false) == true); }
 
     match /meta/app {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.owner == uid();
+      allow read: if signed();
+      allow create: if signed() && request.resource.data.owner == uid();
       allow update: if admin();
     }
     match /meta/secret { allow read, write: if admin(); }
     match /members/{m} {
-      allow read: if request.auth != null && (m == uid() || active());
-      allow create: if request.auth != null && m == uid() && request.resource.data.status == 'active' && (
+      allow read: if signed() && (m == uid() || active());
+      allow create: if signed() && m == uid() && request.resource.data.status == 'active' && (
         (request.resource.data.role == 'admin' && get(/databases/$(db)/documents/meta/app).data.owner == uid()) ||
-        (request.resource.data.role == 'user' && request.resource.data.code == get(/databases/$(db)/documents/meta/secret).data.code));
-      allow update: if admin() || (active() && m == uid() && request.resource.data.role == resource.data.role && request.resource.data.status == resource.data.status);
+        (request.resource.data.role == 'user'
+          && request.resource.data.code == get(/databases/$(db)/documents/meta/secret).data.code
+          && request.resource.data.get('perms', {}).keys().hasOnly(['exp', 'wrk'])));
+      allow update: if admin() || (active() && m == uid() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
       allow delete: if admin();
     }
-    match /projects/{document=**} { allow read, write: if active(); }
+
+    // Proje adı, şantiye, işveren: ekipteki herkes görür. Proje açma/düzenleme: gelir yetkisi.
+    match /projects/{pid} {
+      allow read: if active();
+      allow write: if can('fin');
+    }
+    // Keşif (fiyatsız) ve imalat kayıtları
+    match /projects/{pid}/data/{d} {
+      allow read: if active();
+      allow write: if can('wrk') || can('fin');
+    }
+    // Giderler
+    match /projects/{pid}/exp/{d} {
+      allow read, write: if can('exp');
+    }
+    // Birim fiyatlar, sözleşme bedeli, oranlar, hakedişler, tahsilatlar, teminat mektupları
+    match /projects/{pid}/fin/{d} {
+      allow read: if can('fin');
+      allow write: if can('hk') || (can('fin') && !(d == 'hk' || d == 'pay' || d.matches('hkl-.*')));
+    }
+
     match /feed/{d} { allow read, write: if active(); }
+    match /feedf/{d} { allow read, write: if can('fin'); }
     match /files/{f} { allow read, write: if active(); }
   }
 }
